@@ -1,5 +1,7 @@
 package cn.hulingfeng.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.lucene.util.QueryBuilder;
 import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.delete.DeleteResponse;
@@ -20,8 +22,10 @@ import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.index.query.BoolQueryBuilder;
+import org.elasticsearch.index.query.MultiMatchQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.RangeQueryBuilder;
+import org.elasticsearch.index.search.MultiMatchQuery;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,14 +52,20 @@ public class ESController {
     private RestHighLevelClient client;
 
     /**
+     * 由于涉及分页，searchResponse返回的东西比较杂，于是将查询结果和总条数提取出来，再转换成json格式返回给前端
+     */
+    private ObjectMapper objectMapper = new ObjectMapper();
+
+    private static final Integer DEFAULT_PAGE_SIZE = 10;
+
+    /**
      * 创建索引
-     *
      * @param indexName
      * @return
      * @throws IOException
      */
     @PostMapping("/index/create")
-    public ResponseEntity createIndex(@RequestParam(name = "indexName", defaultValue = "document") String indexName) throws IOException {
+    public ResponseEntity createIndex(@RequestParam(name = "indexName", defaultValue = "news") String indexName) {
         CreateIndexRequest request = new CreateIndexRequest(indexName);
         request.settings(Settings.builder()
                 .put("index.number_of_shards", 5)
@@ -63,29 +73,44 @@ public class ESController {
         );
 
         //mapping构建
-        XContentBuilder builder = XContentFactory.jsonBuilder().startObject()
-                .startObject("properties")
-                    .startObject("type")//文档类型
-                    .field("type", "keyword")
-                    .endObject()
-                    .startObject("title")//标题
-                    .field("type", "text")
-                    .endObject()
-                    .startObject("author")//作者
-                    .field("type", "keyword")
-                    .endObject()
-                    .startObject("publish_date")//发表日期
-                    .field("type", "date")
-                    .field("format", "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis")
-                    .endObject()
-                    .startObject("word_count")//总字数
-                    .field("type", "integer")
-                    .endObject()
-                .endObject()
-        .endObject();
-        request.mapping(builder);
+        XContentBuilder builder = null;
+        CreateIndexResponse createIndexResponse = null;
 
-        CreateIndexResponse createIndexResponse = this.client.indices().create(request, RequestOptions.DEFAULT);
+        try {
+            builder = XContentFactory.jsonBuilder().startObject()
+                    .startObject("properties")
+                        .startObject("type")//文档类型
+                        .field("type", "keyword")
+                        .endObject()
+                        .startObject("file_name")//文件名
+                        .field("type", "text")
+                        .endObject()
+                        .startObject("title")//标题
+                        .field("type", "text")
+                        .endObject()
+                        .startObject("author")//作者
+                        .field("type", "keyword")
+                        .endObject()
+                        .startObject("publish_date")//发表日期
+                        .field("type", "date")
+                        .field("format", "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis")
+                        .endObject()
+                        .startObject("content")//内容
+                        .field("type", "text")
+                        .endObject()
+                        .startObject("word_count")//总字数
+                        .field("type", "integer")
+                        .endObject()
+                    .endObject()
+            .endObject();
+            request.mapping(builder);
+
+            createIndexResponse = this.client.indices().create(request, RequestOptions.DEFAULT);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return new ResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
         boolean acknowledged = createIndexResponse.isAcknowledged();
         if (acknowledged) {
             return new ResponseEntity(HttpStatus.OK);
@@ -100,7 +125,7 @@ public class ESController {
      */
     @GetMapping("/get/document")
     public ResponseEntity get(@RequestParam(name = "id", defaultValue = "") String id) {
-        GetRequest getRequest = new GetRequest("document", id);
+        GetRequest getRequest = new GetRequest("news", id);
         GetResponse result = null;
         if (id.isEmpty()) {
             return new ResponseEntity(HttpStatus.NOT_FOUND);
@@ -128,22 +153,27 @@ public class ESController {
      */
     @PostMapping("add/document")
     public ResponseEntity add(
+            @RequestParam(name = "type") String type,
+            @RequestParam(name = "file_name") String fileName,
             @RequestParam(name = "title") String title,
             @RequestParam(name = "author") String author,
-            @RequestParam(name = "type") String type,
             @RequestParam(name = "publish_date")
                     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") Date publishDate,
+            @RequestParam(name = "content") String content,
+
             @RequestParam(name = "word_count") Integer wordCount) {
         try {
-            XContentBuilder content = XContentFactory.jsonBuilder()
+            XContentBuilder xContent = XContentFactory.jsonBuilder()
                     .startObject()
                     .field("title", title)
+                    .field("file_name", fileName)
                     .field("author", author)
                     .field("type", type)
                     .field("publish_date", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(publishDate))
+                    .field("content", content)
                     .field("word_count", wordCount)
                     .endObject();
-            IndexRequest request = new IndexRequest("document").source(content);
+            IndexRequest request = new IndexRequest("news").source(xContent);
             IndexResponse result = this.client.index(request, RequestOptions.DEFAULT);
             return new ResponseEntity(result.getId(), HttpStatus.OK);
         } catch (IOException e) {
@@ -159,7 +189,7 @@ public class ESController {
      */
     @DeleteMapping("/delete/document")
     public ResponseEntity delete(@RequestParam(name = "id")String id){
-        DeleteRequest request = new DeleteRequest("document", id);
+        DeleteRequest request = new DeleteRequest("news", id);
         DeleteResponse result = null;
         try {
             result = client.delete(request, RequestOptions.DEFAULT);
@@ -207,7 +237,7 @@ public class ESController {
                 builder.field("word_count", wordCount);
             }
             builder.endObject();
-            UpdateRequest request = new UpdateRequest("document", id).doc(builder);
+            UpdateRequest request = new UpdateRequest("news", id).doc(builder);
             UpdateResponse result = client.update(request, RequestOptions.DEFAULT);
             return new ResponseEntity(result.getResult().toString(),HttpStatus.OK);
         } catch (IOException e) {
@@ -227,19 +257,24 @@ public class ESController {
      * @param ltPublishDate
      * @return
      */
-    @PostMapping("/query/document")
+    @GetMapping("/query/document")
     public ResponseEntity query(
+            @RequestParam(name = "file_name",required = false)String fileName,
             @RequestParam(name = "author",required = false)String author,
             @RequestParam(name = "title",required = false)String title,
             @RequestParam(name = "type",required = false)String type,
             @RequestParam(name = "gt_word_count",defaultValue = "0")Integer gtWordCount,
             @RequestParam(name = "lt_word_count",required = false)Integer ltWordCount,
             @RequestParam(name = "gt_publish_date",required = false)
-                @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") Date gtPublishDate,
+                @DateTimeFormat(pattern = "yyyy-MM-dd") Date gtPublishDate,
             @RequestParam(name = "lt_publish_date",required = false)
-                @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss")Date ltPublishDate){
+                @DateTimeFormat(pattern = "yyyy-MM-dd")Date ltPublishDate,
+            @RequestParam(name = "page_num",defaultValue = "1")Integer pageNum) {
 
         BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
+        if(fileName != null){
+            boolQuery.must(QueryBuilders.matchQuery("file_name",fileName));
+        }
         if(author != null){
             boolQuery.must(QueryBuilders.matchQuery("author",author));
         }
@@ -259,14 +294,18 @@ public class ESController {
         if(gtPublishDate != null){
             dateRangeQuery.from(gtPublishDate.getTime());
         }
+        //将结束时间加一天
         if(ltPublishDate != null){
-            dateRangeQuery.to(ltPublishDate.getTime());
+            Calendar calendar = Calendar.getInstance();
+            calendar.setTime(ltPublishDate);
+            calendar.add(Calendar.DAY_OF_MONTH,1);
+            dateRangeQuery.to(calendar.getTimeInMillis());
         }
         boolQuery.filter(dateRangeQuery);
 
-        SearchSourceBuilder builder = new SearchSourceBuilder().query(boolQuery).from(0).size(10);
+        SearchSourceBuilder builder = new SearchSourceBuilder().query(boolQuery).from((pageNum-1)*DEFAULT_PAGE_SIZE).size(DEFAULT_PAGE_SIZE);
 
-        SearchRequest searchRequest = new SearchRequest("document").source(builder);
+        SearchRequest searchRequest = new SearchRequest("news").source(builder);
         SearchResponse searchResponse = null;
         try {
              searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
@@ -275,11 +314,60 @@ public class ESController {
             return new ResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR);
         }
 
-        List<Map<String,Object>> result = new ArrayList<>();
+        Map result = new HashMap();
+        result.put("total",searchResponse.getHits().getTotalHits().value);
+        List<Map<String,Object>> list = new ArrayList<>();
         for(SearchHit hit : searchResponse.getHits()){
-            result.add(hit.getSourceAsMap());
+            list.add(hit.getSourceAsMap());
         }
-        return new ResponseEntity(result,HttpStatus.OK);
+        result.put("list",list);
+        try {
+            return new ResponseEntity(objectMapper.writeValueAsString(result),HttpStatus.OK);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+            return new ResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * 搜索框搜索
+     * @param queryContent
+     * @param pageNum
+     * @return
+     * @throws JsonProcessingException
+     */
+    @GetMapping("/query/global/document")
+    public ResponseEntity query(
+            @RequestParam(name = "query_content",defaultValue = "")String queryContent,
+            @RequestParam(name = "page_num",defaultValue = "1")Integer pageNum) {
+        String fieldName1 = "title";
+        String fieldName2 = "author";
+        String fieldName3 = "content";
+        MultiMatchQueryBuilder multiMatchQuery = QueryBuilders.multiMatchQuery(queryContent,fieldName1,fieldName2,fieldName3);
+        SearchSourceBuilder builder = new SearchSourceBuilder().query(multiMatchQuery).from((pageNum-1)*DEFAULT_PAGE_SIZE).size(DEFAULT_PAGE_SIZE);
+
+        SearchRequest searchRequest = new SearchRequest("news").source(builder);
+        SearchResponse searchResponse = null;
+        try {
+            searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return new ResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+
+        Map result = new HashMap();
+        result.put("total",searchResponse.getHits().getTotalHits().value);
+        List<Map<String,Object>> list = new ArrayList<>();
+        for(SearchHit hit : searchResponse.getHits()){
+            list.add(hit.getSourceAsMap());
+        }
+        result.put("list",list);
+        try {
+            return new ResponseEntity(objectMapper.writeValueAsString(result),HttpStatus.OK);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+            return new ResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
 }

@@ -31,7 +31,7 @@ public class DocController {
     }
 
     @GetMapping("file_download")
-    public void fileDownload(HttpServletResponse httpServletResponse, @RequestParam(name = "fileName")String fileName) throws FileNotFoundException {
+    public void fileDownload(HttpServletResponse httpServletResponse, @RequestParam(name = "file_name")String fileName) throws FileNotFoundException {
         docService.download(httpServletResponse,fileName);
     }
 }
