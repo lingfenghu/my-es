@@ -51,55 +51,54 @@ public class ESController {
     @Autowired
     private RestHighLevelClient client;
 
-    /**
-     * 由于涉及分页，searchResponse返回的东西比较杂，于是将查询结果和总条数提取出来，再转换成json格式返回给前端
-     */
-    private ObjectMapper objectMapper = new ObjectMapper();
-
     private static final Integer DEFAULT_PAGE_SIZE = 10;
 
+    private ObjectMapper objectMapper = new ObjectMapper();//由于涉及分页，searchResponse返回的东西比较杂，于是将查询结果和总条数提取出来，再转换成json格式返回给前端
+
     /**
-     * 创建索引
+     * 创建文档索引
      * @param indexName
      * @return
      * @throws IOException
      */
     @PostMapping("/index/create")
-    public ResponseEntity createIndex(@RequestParam(name = "indexName", defaultValue = "news") String indexName) {
+    public ResponseEntity createIndex(@RequestParam(name = "indexName", defaultValue = "default-index") String indexName) {
         CreateIndexRequest request = new CreateIndexRequest(indexName);
         request.settings(Settings.builder()
                 .put("index.number_of_shards", 5)
                 .put("index.number_of_replicas", 0)
         );
-
         //mapping构建
         XContentBuilder builder = null;
         CreateIndexResponse createIndexResponse = null;
-
         try {
             builder = XContentFactory.jsonBuilder().startObject()
                     .startObject("properties")
-                        .startObject("type")//文档类型
-                        .field("type", "keyword")
-                        .endObject()
-                        .startObject("file_name")//文件名
-                        .field("type", "text")
-                        .endObject()
                         .startObject("title")//标题
-                        .field("type", "text")
-                        .endObject()
-                        .startObject("author")//作者
-                        .field("type", "keyword")
+                            .field("type", "text")
+                            .field("analyzer","ik_max_word")
                         .endObject()
                         .startObject("publish_date")//发表日期
-                        .field("type", "date")
-                        .field("format", "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis")
+                            .field("type", "date")
+                            .field("format", "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis")
                         .endObject()
-                        .startObject("content")//内容
-                        .field("type", "text")
+                        .startObject("source")//来源
+                            .field("type", "text")
+                            .field("analyzer","ik_max_word")
+                        .endObject()
+                        .startObject("editor")//责任编辑
+                            .field("type", "text")
+                            .field("analyzer","ik_max_word")
+                        .endObject()
+                        .startObject("desc")//简述
+                            .field("type", "text")
+                            .field("analyzer","ik_max_word")
+                        .endObject()
+                        .startObject("file_name")//文件名
+                            .field("type", "keyword")
                         .endObject()
                         .startObject("word_count")//总字数
-                        .field("type", "integer")
+                            .field("type", "integer")
                         .endObject()
                     .endObject()
             .endObject();
@@ -123,10 +122,11 @@ public class ESController {
      * @param id
      * @return
      */
-    @GetMapping("/get/document")
+    @Deprecated
+    @GetMapping("/get/document")//推荐@PathVariable
     public ResponseEntity get(@RequestParam(name = "id", defaultValue = "") String id) {
         GetRequest getRequest = new GetRequest("news", id);
-        GetResponse result = null;
+        GetResponse result;
         if (id.isEmpty()) {
             return new ResponseEntity(HttpStatus.NOT_FOUND);
         }
@@ -145,32 +145,34 @@ public class ESController {
     /**
      * 添加文档
      * @param title
-     * @param author
-     * @param type
+     * @param source
+     * @param editor
      * @param publishDate
+     * @param desc
+     * @param fileName
      * @param wordCount
      * @return
      */
+    @Deprecated
     @PostMapping("add/document")
     public ResponseEntity add(
-            @RequestParam(name = "type") String type,
-            @RequestParam(name = "file_name") String fileName,
             @RequestParam(name = "title") String title,
-            @RequestParam(name = "author") String author,
+            @RequestParam(name = "source") String source,
+            @RequestParam(name = "editor") String editor,
             @RequestParam(name = "publish_date")
                     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") Date publishDate,
-            @RequestParam(name = "content") String content,
-
+            @RequestParam(name = "desc") String desc,
+            @RequestParam(name = "file_name") String fileName,
             @RequestParam(name = "word_count") Integer wordCount) {
         try {
             XContentBuilder xContent = XContentFactory.jsonBuilder()
                     .startObject()
                     .field("title", title)
-                    .field("file_name", fileName)
-                    .field("author", author)
-                    .field("type", type)
+                    .field("source", source)
+                    .field("editor", editor)
                     .field("publish_date", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(publishDate))
-                    .field("content", content)
+                    .field("desc", desc)
+                    .field("file_name", fileName)
                     .field("word_count", wordCount)
                     .endObject();
             IndexRequest request = new IndexRequest("news").source(xContent);
@@ -183,14 +185,15 @@ public class ESController {
     }
 
     /**
-     * 更新文档
+     * 删除文档
      * @param id
      * @return
      */
-    @DeleteMapping("/delete/document")
+    @Deprecated
+    @DeleteMapping("/delete/document")//推荐@PathVariable
     public ResponseEntity delete(@RequestParam(name = "id")String id){
         DeleteRequest request = new DeleteRequest("news", id);
-        DeleteResponse result = null;
+        DeleteResponse result;
         try {
             result = client.delete(request, RequestOptions.DEFAULT);
         } catch (IOException e) {
@@ -204,38 +207,45 @@ public class ESController {
      * 修改文档
      * @param id
      * @param title
-     * @param author
-     * @param type
+     * @param source
+     * @param editor
      * @param publishDate
-     * @param wordCount
+     * @param desc
      * @return
      */
+    @Deprecated
     @PutMapping("/update/document")
     public ResponseEntity update(
             @RequestParam(name = "id")String id,
-            @RequestParam(name = "title",required = false) String title,
-            @RequestParam(name = "author",required = false) String author,
-            @RequestParam(name = "type",required = false) String type,
-            @RequestParam(name = "publish_date",required = false)
+            @RequestParam(name = "title") String title,
+            @RequestParam(name = "source") String source,
+            @RequestParam(name = "editor") String editor,
+            @RequestParam(name = "publish_date")
             @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") Date publishDate,
-            @RequestParam(name = "word_count",required = false) Integer wordCount){
+            @RequestParam(name = "desc") String desc){
         try {
             XContentBuilder builder = XContentFactory.jsonBuilder().startObject();
             if(title != null && !title.isEmpty()){
                 builder.field("title", title);
             }
-            if(author != null && !author.isEmpty()){
-                builder.field("author", author);
+            if(source != null && !source.isEmpty()){
+                builder.field("source", source);
             }
-            if(type != null && !type.isEmpty()){
-                builder.field("type", type);
+            if(editor != null && !editor.isEmpty()){
+                builder.field("editor", editor);
             }
             if(publishDate != null){
                 builder.field("publish_date", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(publishDate));
             }
-            if(wordCount != null && wordCount > 0){
-                builder.field("word_count", wordCount);
+            if(desc != null && !desc.isEmpty()){
+                builder.field("desc", desc);
             }
+//            if(fileName != null && fileName > 0){
+//                builder.field("file_name", fileName);
+//            }
+//            if(wordCount != null && wordCount > 0){
+//                builder.field("word_count", wordCount);
+//            }
             builder.endObject();
             UpdateRequest request = new UpdateRequest("news", id).doc(builder);
             UpdateResponse result = client.update(request, RequestOptions.DEFAULT);
@@ -247,22 +257,16 @@ public class ESController {
     }
 
     /**
-     * 文档查询
-     * @param author
-     * @param title
-     * @param type
+     * 文档高级查询
      * @param gtWordCount
      * @param ltWordCount
      * @param gtPublishDate
      * @param ltPublishDate
+     * @param pageNum
      * @return
      */
     @GetMapping("/query/document")
     public ResponseEntity query(
-            @RequestParam(name = "file_name",required = false)String fileName,
-            @RequestParam(name = "author",required = false)String author,
-            @RequestParam(name = "title",required = false)String title,
-            @RequestParam(name = "type",required = false)String type,
             @RequestParam(name = "gt_word_count",defaultValue = "0")Integer gtWordCount,
             @RequestParam(name = "lt_word_count",required = false)Integer ltWordCount,
             @RequestParam(name = "gt_publish_date",required = false)
@@ -270,20 +274,7 @@ public class ESController {
             @RequestParam(name = "lt_publish_date",required = false)
                 @DateTimeFormat(pattern = "yyyy-MM-dd")Date ltPublishDate,
             @RequestParam(name = "page_num",defaultValue = "1")Integer pageNum) {
-
         BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
-        if(fileName != null){
-            boolQuery.must(QueryBuilders.matchQuery("file_name",fileName));
-        }
-        if(author != null){
-            boolQuery.must(QueryBuilders.matchQuery("author",author));
-        }
-        if(title != null){
-            boolQuery.must(QueryBuilders.matchQuery("title",title));
-        }
-        if(type != null){
-            boolQuery.must(QueryBuilders.matchQuery("type",type));
-        }
         RangeQueryBuilder wordCountRangeQuery = QueryBuilders.rangeQuery("word_count").from(gtWordCount);
         if(ltWordCount != null && ltWordCount > 0){
             wordCountRangeQuery.to(ltWordCount);
@@ -305,7 +296,7 @@ public class ESController {
 
         SearchSourceBuilder builder = new SearchSourceBuilder().query(boolQuery).from((pageNum-1)*DEFAULT_PAGE_SIZE).size(DEFAULT_PAGE_SIZE);
 
-        SearchRequest searchRequest = new SearchRequest("news").source(builder);
+        SearchRequest searchRequest = new SearchRequest("news002").source(builder);
         SearchResponse searchResponse = null;
         try {
              searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
@@ -330,23 +321,24 @@ public class ESController {
     }
 
     /**
-     * 搜索框搜索
+     * 文档高级查询
      * @param queryContent
      * @param pageNum
      * @return
-     * @throws JsonProcessingException
      */
     @GetMapping("/query/global/document")
     public ResponseEntity query(
             @RequestParam(name = "query_content",defaultValue = "")String queryContent,
             @RequestParam(name = "page_num",defaultValue = "1")Integer pageNum) {
-        String fieldName1 = "title";
-        String fieldName2 = "author";
-        String fieldName3 = "content";
-        MultiMatchQueryBuilder multiMatchQuery = QueryBuilders.multiMatchQuery(queryContent,fieldName1,fieldName2,fieldName3);
-        SearchSourceBuilder builder = new SearchSourceBuilder().query(multiMatchQuery).from((pageNum-1)*DEFAULT_PAGE_SIZE).size(DEFAULT_PAGE_SIZE);
 
-        SearchRequest searchRequest = new SearchRequest("news").source(builder);
+        String fieldName1 = "title";
+        String fieldName2 = "source";
+        String fieldName3 = "editor";
+        String fieldName4 = "desc";
+
+        MultiMatchQueryBuilder multiMatchQuery = QueryBuilders.multiMatchQuery(queryContent,fieldName1,fieldName2,fieldName3,fieldName4);
+        SearchSourceBuilder builder = new SearchSourceBuilder().query(multiMatchQuery).from((pageNum-1)*DEFAULT_PAGE_SIZE).size(DEFAULT_PAGE_SIZE);
+        SearchRequest searchRequest = new SearchRequest("news002").source(builder);
         SearchResponse searchResponse = null;
         try {
             searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
@@ -354,7 +346,6 @@ public class ESController {
             e.printStackTrace();
             return new ResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR);
         }
-
         Map result = new HashMap();
         result.put("total",searchResponse.getHits().getTotalHits().value);
         List<Map<String,Object>> list = new ArrayList<>();

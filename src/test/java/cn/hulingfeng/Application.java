@@ -30,10 +30,13 @@ import org.elasticsearch.search.fetch.subphase.FetchSourceContext;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import java.io.IOException;
+import java.io.*;
+import java.lang.reflect.Field;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * es api测试
@@ -45,6 +48,25 @@ import java.util.Map;
  */
 @SpringBootTest
 public class Application {
+
+    @Test
+    public void getWordCount() throws IOException {
+        int count = 0;
+        String regex = "[\\u4E00-\\u9FA5|，|。|；|“|”|：|、|！|？|......|{|}|（|）|《|》|\\d]";
+        File file = new File("C:\\Users\\HLF\\Desktop\\bs\\news_doc\\钟南山：今天有个好消息.txt");
+        BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
+        String lineStr;
+        while (( lineStr = bufferedReader.readLine())!=null){
+            count = 0;
+            Pattern pattern = Pattern.compile(regex);
+            Matcher matcher = pattern.matcher(lineStr);
+            while(matcher.find()){
+                count++;
+            }
+
+            System.out.println(lineStr+"|"+lineStr.length()+"|"+count);
+        }
+    }
 
     @Test
     public void getClient() throws IOException {
@@ -182,7 +204,6 @@ public class Application {
 
     @Test
     public void bulkApi() throws IOException {
-
         RestHighLevelClient client = new RestHighLevelClient(
                 RestClient.builder(new HttpHost("localhost", 9200, "http")));
         //仅支持JSON和SMILE文档格式
@@ -226,5 +247,10 @@ public class Application {
                 new MatchQueryBuilder("user", "kimchy");
         searchSourceBuilder.query(matchQueryBuilder);
         SearchResponse searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
+    }
+
+    @Test
+    public void IKAnalyzer() {
+
     }
 }

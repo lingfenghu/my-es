@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
+ * ElasticSearch配置类
  * @author hlf
  * @title: ESConfig
  * @projectName es
@@ -16,11 +17,14 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class ESConfig {
 
+    /**
+     * 客户端client配置
+     * @return
+     */
     @Bean
     public RestHighLevelClient client(){
         RestHighLevelClient client = new RestHighLevelClient(
-                RestClient.builder(
-                        new HttpHost("localhost", 9200, "http")));
+                RestClient.builder(new HttpHost("localhost", 9200, "http")));
         return client;
     }
 }
