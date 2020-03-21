@@ -28,17 +28,10 @@ import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.fetch.subphase.FetchSourceContext;
-import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 import java.io.*;
-import java.lang.reflect.Field;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -257,19 +250,14 @@ public class Application {
     }
 
     @Test
-    public void IKAnalyzer() {
-
-    }
-
-    @Test
     public void fetch163TopNewsUrl() throws IOException {
-        Document document = Jsoup.connect("https://news.163.com/").validateTLSCertificates(false).get();
-        Element topNews = document.getElementById("js_top_news");
-        Elements elements = topNews.select("a");
-        for(Element a : elements){
-            System.out.println(a.attr("href"));
-            fetch163News(a.attr("href"));
-        }
+//        Document document = Jsoup.connect("https://news.163.com/").validateTLSCertificates(false).get();
+//        Element topNews = document.getElementById("js_top_news");
+//        Elements elements = topNews.select("a");
+//        for(Element a : elements){
+//            System.out.println(a.attr("href"));
+//            fetch163News(a.attr("href"));
+//        }
 //        https://news.163.com/20/0317/09/F7TNS8QQ000189FH.html
 //        https://news.163.com/20/0317/11/F7TRQ66M000189FH.html
 //        https://news.163.com/20/0317/11/F7TRSNRK000189FH.html
@@ -285,56 +273,56 @@ public class Application {
 //        https://news.163.com/20/0317/04/F7T6DFIM0001899O.html
     }
 
-//    @Test
+    @Test
     public void fetch163News(String url) throws IOException {
         //https://news.163.com/20/0317/02/F7SSJNOE0001899O.html  新闻样例
         //https://blog.csdn.net/u014256984/article/details/73330573 证书问题解决
-        Document document = Jsoup.connect(url).validateTLSCertificates(false).get();
-
-//        Document document = Jsoup.connect("https://news.163.com/20/0317/11/F7TRSNRK000189FH.html").validateTLSCertificates(false).get();
-        Element postContentMain = document.getElementsByClass("post_content_main").first();
-        Element h1 = postContentMain.getElementsByTag("h1").first();
-        Element postTimeSource = document.getElementsByClass("post_time_source").first();
-        Pattern pattern = Pattern.compile("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}");
-        Matcher matcher = pattern.matcher(postTimeSource.text());
-        String dateTime = "";
-        if(matcher.find()){
-            dateTime = matcher.group();
-        }
-        Element a = postTimeSource.getElementsByTag("a").first();
-
-        String article = "";
-        Element postText = document.getElementsByClass("post_text").first();
-        Elements elements = postText.getElementsByTag("p");
-        for(Element p : elements){
-            article += p.text();
-//            System.out.println(p.text());
-        }
-//        Element p = postContentMain.getElementsByTag("p").get(3);
-//        System.out.println(p);
-
-        Element epSource = postText.getElementsByClass("ep-source cDGray").first();
-        Element span = epSource.getElementsByTag("span").get(1);
-//                postText.select(".ep-source").select(".cDGray").first();
-        String[] epEditor = span.text().split("\\：");
-//        System.out.println(epEditor[1]);
-
-        String title = h1.text();
-//        Date date = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(dateTime);
-        String source = a.text();
-        String editor = epEditor[1];
-        String content = article;
-        String desc = elements.get(1).text();
-
-//        System.out.println("title:"+title+"\ndate:"+dateTime+"\nsource:"+source+"\neditor:"+editor+"\ncontent:"+content);
-        String news = title+"||"+dateTime+"||"+source+"||"+editor+"||"+desc;
-
-        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(news.getBytes());
-        String fileName = System.currentTimeMillis()+".txt";
-        File file = new File(FileUtils.PATH+fileName);
-        FileOutputStream fileOutputStream = new FileOutputStream(file);
-        fileOutputStream.write(news.getBytes());
-        fileOutputStream.close();
+//        Document document = Jsoup.connect(url).validateTLSCertificates(false).get();
+//
+////        Document document = Jsoup.connect("https://news.163.com/20/0317/11/F7TRSNRK000189FH.html").validateTLSCertificates(false).get();
+//        Element postContentMain = document.getElementsByClass("post_content_main").first();
+//        Element h1 = postContentMain.getElementsByTag("h1").first();
+//        Element postTimeSource = document.getElementsByClass("post_time_source").first();
+//        Pattern pattern = Pattern.compile("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}");
+//        Matcher matcher = pattern.matcher(postTimeSource.text());
+//        String dateTime = "";
+//        if(matcher.find()){
+//            dateTime = matcher.group();
+//        }
+//        Element a = postTimeSource.getElementsByTag("a").first();
+//
+//        String article = "";
+//        Element postText = document.getElementsByClass("post_text").first();
+//        Elements elements = postText.getElementsByTag("p");
+//        for(Element p : elements){
+//            article += p.text();
+////            System.out.println(p.text());
+//        }
+////        Element p = postContentMain.getElementsByTag("p").get(3);
+////        System.out.println(p);
+//
+//        Element epSource = postText.getElementsByClass("ep-source cDGray").first();
+//        Element span = epSource.getElementsByTag("span").get(1);
+////                postText.select(".ep-source").select(".cDGray").first();
+//        String[] epEditor = span.text().split("\\：");
+////        System.out.println(epEditor[1]);
+//
+//        String title = h1.text();
+////        Date date = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(dateTime);
+//        String source = a.text();
+//        String editor = epEditor[1];
+//        String content = article;
+//        String desc = elements.get(1).text();
+//
+////        System.out.println("title:"+title+"\ndate:"+dateTime+"\nsource:"+source+"\neditor:"+editor+"\ncontent:"+content);
+//        String news = title+"||"+dateTime+"||"+source+"||"+editor+"||"+desc;
+//
+//        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(news.getBytes());
+//        String fileName = System.currentTimeMillis()+".txt";
+//        File file = new File(FileUtils.PATH+fileName);
+//        FileOutputStream fileOutputStream = new FileOutputStream(file);
+//        fileOutputStream.write(news.getBytes());
+//        fileOutputStream.close();
     }
 
 
