@@ -1,13 +1,14 @@
 server:
+  port: 8443
+  ssl:
+    key-alias: tomcat
+    key-store: server.keystore
+    key-store-password: 123456
+    key-store-type: JKS
+    enabled: true
+http:
   port: 8080
-  servlet:
-    context-path: /
 #日志级别
 logging:
   level:
     root: info
-spring:
-  datasource:
-  #日期格式化
-  jackson:
-    date-format: yyyy-MM-dd HH:mm:ss

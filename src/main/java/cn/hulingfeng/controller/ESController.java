@@ -1,5 +1,6 @@
 package cn.hulingfeng.controller;
 
+import cn.hulingfeng.service.ESService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.lucene.util.QueryBuilder;
@@ -50,6 +51,9 @@ public class ESController {
 
     @Autowired
     private RestHighLevelClient client;
+
+    @Autowired
+    private ESService esService;
 
     private static final Integer DEFAULT_PAGE_SIZE = 10;
 
@@ -164,24 +168,25 @@ public class ESController {
             @RequestParam(name = "desc") String desc,
             @RequestParam(name = "file_name") String fileName,
             @RequestParam(name = "word_count") Integer wordCount) {
-        try {
-            XContentBuilder xContent = XContentFactory.jsonBuilder()
-                    .startObject()
-                    .field("title", title)
-                    .field("source", source)
-                    .field("editor", editor)
-                    .field("publish_date", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(publishDate))
-                    .field("desc", desc)
-                    .field("file_name", fileName)
-                    .field("word_count", wordCount)
-                    .endObject();
-            IndexRequest request = new IndexRequest("news").source(xContent);
-            IndexResponse result = this.client.index(request, RequestOptions.DEFAULT);
-            return new ResponseEntity(result.getId(), HttpStatus.OK);
-        } catch (IOException e) {
-            e.printStackTrace();
-            return new ResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        return esService.add(title,source,editor,publishDate,desc,fileName,wordCount);
+//        try {
+//            XContentBuilder xContent = XContentFactory.jsonBuilder()
+//                    .startObject()
+//                    .field("title", title)
+//                    .field("source", source)
+//                    .field("editor", editor)
+//                    .field("publish_date", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(publishDate))
+//                    .field("desc", desc)
+//                    .field("file_name", fileName)
+//                    .field("word_count", wordCount)
+//                    .endObject();
+//            IndexRequest request = new IndexRequest("news").source(xContent);
+//            IndexResponse result = this.client.index(request, RequestOptions.DEFAULT);
+//            return new ResponseEntity(result.getId(), HttpStatus.OK);
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//            return new ResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR);
+//        }
     }
 
     /**
