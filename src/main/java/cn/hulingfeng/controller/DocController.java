@@ -1,12 +1,7 @@
 package cn.hulingfeng.controller;
 
 import cn.hulingfeng.service.DocService;
-import org.elasticsearch.action.index.IndexRequest;
-import org.elasticsearch.action.index.IndexResponse;
-import org.elasticsearch.client.RequestOptions;
-import org.elasticsearch.client.RestHighLevelClient;
-import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.common.xcontent.XContentFactory;
+import cn.hulingfeng.service.ESService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -19,8 +14,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.text.SimpleDateFormat;
 import java.util.Date;
 
 /**
@@ -34,13 +27,12 @@ import java.util.Date;
 public class DocController {
 
     @Autowired
-    private RestHighLevelClient client;
-
-    @Autowired
     private DocService docService;
+    @Autowired
+    private ESService esService;
 
     @PostMapping("file_upload")
-    public ResponseEntity fileUpload(@RequestParam MultipartFile file) throws IOException {
+    public ResponseEntity fileUpload(@RequestParam MultipartFile file) {
         if(file.isEmpty()){
             return new ResponseEntity(HttpStatus.BAD_REQUEST);
         }
@@ -48,12 +40,15 @@ public class DocController {
     }
 
     @GetMapping("file_download")
-    public void fileDownload(HttpServletResponse httpServletResponse, @RequestParam(name = "file_name")String fileName) throws FileNotFoundException {
-        docService.download(httpServletResponse,fileName);
+    public ResponseEntity fileDownload(HttpServletResponse httpServletResponse, @RequestParam(name = "file_name")String fileName) throws FileNotFoundException {
+        if(!docService.download(httpServletResponse,fileName)){
+            return new ResponseEntity(HttpStatus.NOT_FOUND);
+        }
+        return new ResponseEntity(HttpStatus.OK);
     }
 
     @GetMapping("file_details")
-    public org.springframework.http.ResponseEntity fileDetails(
+    public ResponseEntity fileDetails(
             @RequestParam(name = "title") String title,
             @RequestParam(name = "publish_date")
                 @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") Date publishDate,
@@ -61,24 +56,9 @@ public class DocController {
             @RequestParam(name = "editor") String editor,
             @RequestParam(name = "desc",required = false) String desc,
             @RequestParam(name = "file_name") String fileName,
-            @RequestParam(name = "word_count") String wordCount){
-        try {
-            XContentBuilder xContent = XContentFactory.jsonBuilder()
-                    .startObject()
-                    .field("title", title)
-                    .field("publish_date", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(publishDate))
-                    .field("source", source)
-                    .field("editor", editor)
-                    .field("desc", desc)
-                    .field("file_name", fileName)
-                    .field("word_count", wordCount)
-                    .endObject();
-            IndexRequest request = new IndexRequest("news002").source(xContent);
-            IndexResponse result = this.client.index(request, RequestOptions.DEFAULT);
-            return new org.springframework.http.ResponseEntity(result.getId(), HttpStatus.OK);
-        } catch (IOException e) {
-            e.printStackTrace();
-            return new org.springframework.http.ResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+            @RequestParam(name = "word_count") Integer wordCount,
+            @RequestParam(name = "feature_words") String featureWords){
+
+        return esService.add(title,source,editor,publishDate,desc,fileName,wordCount,featureWords);
     }
 }

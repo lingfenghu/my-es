@@ -1,5 +1,6 @@
 package cn.hulingfeng.service;
 
+import cn.hulingfeng.controller.ESController;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.client.RequestOptions;
@@ -40,7 +41,7 @@ public class ESService {
      * @return
      */
     public ResponseEntity add(String title, String source, String editor, Date publishDate,
-                              String desc, String fileName, Integer wordCount){
+                              String desc, String fileName, Integer wordCount, String featureWords){
         try {
             XContentBuilder xContent = XContentFactory.jsonBuilder()
                     .startObject()
@@ -51,8 +52,9 @@ public class ESService {
                     .field("desc", desc)
                     .field("file_name", fileName)
                     .field("word_count", wordCount)
+                    .field("feature_words", featureWords)
                     .endObject();
-            IndexRequest request = new IndexRequest("news002").source(xContent);
+            IndexRequest request = new IndexRequest(ESController.NEWS_DOCUMENT_INDEX).source(xContent);
             IndexResponse result = this.client.index(request, RequestOptions.DEFAULT);
             return new ResponseEntity(result.getId(), HttpStatus.OK);
         } catch (IOException e) {

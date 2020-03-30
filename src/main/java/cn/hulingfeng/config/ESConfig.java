@@ -1,4 +1,4 @@
-package cn.hulingfeng.utils;
+package cn.hulingfeng.config;
 
 import org.apache.http.HttpHost;
 import org.elasticsearch.client.RestClient;

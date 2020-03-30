@@ -1,4 +1,4 @@
-package cn.hulingfeng.utils;
+package cn.hulingfeng.config;
 
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;

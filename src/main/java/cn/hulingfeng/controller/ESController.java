@@ -55,9 +55,12 @@ public class ESController {
     @Autowired
     private ESService esService;
 
+    public static final  String NEWS_DOCUMENT_INDEX = "news-doc";
+
     private static final Integer DEFAULT_PAGE_SIZE = 10;
 
-    private ObjectMapper objectMapper = new ObjectMapper();//由于涉及分页，searchResponse返回的东西比较杂，于是将查询结果和总条数提取出来，再转换成json格式返回给前端
+    //由于涉及分页，searchResponse返回的东西比较杂，于是将查询结果和总条数提取出来，再转换成json格式返回给前端
+    private ObjectMapper objectMapper = new ObjectMapper();
 
     /**
      * 创建文档索引
@@ -66,7 +69,7 @@ public class ESController {
      * @throws IOException
      */
     @PostMapping("/index/create")
-    public ResponseEntity createIndex(@RequestParam(name = "indexName", defaultValue = "default-index") String indexName) {
+    public ResponseEntity createIndex(@RequestParam(name = "indexName", defaultValue = NEWS_DOCUMENT_INDEX) String indexName) {
         CreateIndexRequest request = new CreateIndexRequest(indexName);
         request.settings(Settings.builder()
                 .put("index.number_of_shards", 5)
@@ -89,6 +92,7 @@ public class ESController {
                         .startObject("source")//来源
                             .field("type", "text")
                             .field("analyzer","ik_max_word")
+                            .field("search_analyzer","ik_smart")
                         .endObject()
                         .startObject("editor")//责任编辑
                             .field("type", "text")
@@ -103,6 +107,10 @@ public class ESController {
                         .endObject()
                         .startObject("word_count")//总字数
                             .field("type", "integer")
+                        .endObject()
+                        .startObject("feature_words")//特征关键字
+                            .field("type", "text")
+                            .field("analyzer","whitespace")
                         .endObject()
                     .endObject()
             .endObject();
@@ -167,26 +175,9 @@ public class ESController {
                     @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") Date publishDate,
             @RequestParam(name = "desc") String desc,
             @RequestParam(name = "file_name") String fileName,
-            @RequestParam(name = "word_count") Integer wordCount) {
-        return esService.add(title,source,editor,publishDate,desc,fileName,wordCount);
-//        try {
-//            XContentBuilder xContent = XContentFactory.jsonBuilder()
-//                    .startObject()
-//                    .field("title", title)
-//                    .field("source", source)
-//                    .field("editor", editor)
-//                    .field("publish_date", new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(publishDate))
-//                    .field("desc", desc)
-//                    .field("file_name", fileName)
-//                    .field("word_count", wordCount)
-//                    .endObject();
-//            IndexRequest request = new IndexRequest("news").source(xContent);
-//            IndexResponse result = this.client.index(request, RequestOptions.DEFAULT);
-//            return new ResponseEntity(result.getId(), HttpStatus.OK);
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//            return new ResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR);
-//        }
+            @RequestParam(name = "word_count") Integer wordCount,
+            @RequestParam(name = "feature_words")String featureWords) {
+        return esService.add(title,source,editor,publishDate,desc,fileName,wordCount,featureWords);
     }
 
     /**
@@ -301,7 +292,7 @@ public class ESController {
 
         SearchSourceBuilder builder = new SearchSourceBuilder().query(boolQuery).from((pageNum-1)*DEFAULT_PAGE_SIZE).size(DEFAULT_PAGE_SIZE);
 
-        SearchRequest searchRequest = new SearchRequest("news002").source(builder);
+        SearchRequest searchRequest = new SearchRequest(NEWS_DOCUMENT_INDEX).source(builder);
         SearchResponse searchResponse = null;
         try {
              searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
@@ -336,14 +327,15 @@ public class ESController {
             @RequestParam(name = "query_content",defaultValue = "")String queryContent,
             @RequestParam(name = "page_num",defaultValue = "1")Integer pageNum) {
 
-        String fieldName1 = "title";
-        String fieldName2 = "source";
-        String fieldName3 = "editor";
-        String fieldName4 = "desc";
+        String title = "title";
+        String source = "source";
+        String editor = "editor";
+        String desc = "desc";
+        String featureWords = "feature_words";
 
-        MultiMatchQueryBuilder multiMatchQuery = QueryBuilders.multiMatchQuery(queryContent,fieldName1,fieldName2,fieldName3,fieldName4);
+        MultiMatchQueryBuilder multiMatchQuery = QueryBuilders.multiMatchQuery(queryContent,title,source,editor,desc,featureWords);
         SearchSourceBuilder builder = new SearchSourceBuilder().query(multiMatchQuery).from((pageNum-1)*DEFAULT_PAGE_SIZE).size(DEFAULT_PAGE_SIZE);
-        SearchRequest searchRequest = new SearchRequest("news002").source(builder);
+        SearchRequest searchRequest = new SearchRequest(NEWS_DOCUMENT_INDEX).source(builder);
         SearchResponse searchResponse = null;
         try {
             searchResponse = client.search(searchRequest, RequestOptions.DEFAULT);
