@@ -31,6 +31,11 @@ public class DocController {
     @Autowired
     private ESService esService;
 
+    /**
+     * 文档上传
+     * @param file
+     * @return
+     */
     @PostMapping("file_upload")
     public ResponseEntity fileUpload(@RequestParam MultipartFile file) {
         if(file.isEmpty()){
@@ -39,6 +44,13 @@ public class DocController {
         return docService.upload(file);
     }
 
+    /**
+     * 文档下载
+     * @param httpServletResponse
+     * @param fileName
+     * @return
+     * @throws FileNotFoundException
+     */
     @GetMapping("file_download")
     public ResponseEntity fileDownload(HttpServletResponse httpServletResponse, @RequestParam(name = "file_name")String fileName) throws FileNotFoundException {
         if(!docService.download(httpServletResponse,fileName)){
@@ -47,6 +59,18 @@ public class DocController {
         return new ResponseEntity(HttpStatus.OK);
     }
 
+    /**
+     * 文档详细信息
+     * @param title
+     * @param publishDate
+     * @param source
+     * @param editor
+     * @param desc
+     * @param fileName
+     * @param wordCount
+     * @param featureWords
+     * @return
+     */
     @GetMapping("file_details")
     public ResponseEntity fileDetails(
             @RequestParam(name = "title") String title,
@@ -58,7 +82,6 @@ public class DocController {
             @RequestParam(name = "file_name") String fileName,
             @RequestParam(name = "word_count") Integer wordCount,
             @RequestParam(name = "feature_words") String featureWords){
-
         return esService.add(title,source,editor,publishDate,desc,fileName,wordCount,featureWords);
     }
 }

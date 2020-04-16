@@ -1,14 +1,12 @@
+
 server:
   port: 8080
-#  ssl:
-#    key-alias: tomcat
-#    key-store: server.keystore
-#    key-store-password: 123456
-#    key-store-type: JKS
-#    enabled: true
-#http:
-#  port: 8080
-#日志级别
 logging:
   level:
     root: info
+spring:
+  servlet:
+    multipart:
+      max-file-size: 10MB
+  profiles:
+    active: prod

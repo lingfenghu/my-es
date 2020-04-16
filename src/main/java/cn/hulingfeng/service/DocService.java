@@ -1,6 +1,5 @@
 package cn.hulingfeng.service;
 
-import cn.hulingfeng.controller.DocController;
 import cn.hulingfeng.utils.FileUtils;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
@@ -9,9 +8,11 @@ import org.elasticsearch.client.indices.AnalyzeResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.util.ResourceUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -19,6 +20,8 @@ import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.net.URLEncoder;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * @author hlf
@@ -33,7 +36,7 @@ public class DocService {
     @Autowired
     private RestHighLevelClient client;
 
-    private static final Logger log = LoggerFactory.getLogger(DocController.class);
+    private static final Logger log = LoggerFactory.getLogger(DocService.class);
 
     /**
      * 文件上传服务
@@ -41,16 +44,18 @@ public class DocService {
      * @return
      */
     public ResponseEntity upload(MultipartFile file) {
-        int wordCount = 0;
+        int wordCount;
         String feature_words;
         //文件名和文件类型
         String originalFilename = file.getOriginalFilename();
-        String[] arr = originalFilename.split("\\.");
-        //获取当前时间戳命名文件
-        String fileName = System.currentTimeMillis()+"."+arr[1];
-        String path = FileUtils.PATH+fileName;
+        String fileName = System.currentTimeMillis()+originalFilename.substring(originalFilename.lastIndexOf("."));
         //将路径转换为绝对路径
-        File dest = new File(path).getAbsoluteFile();
+        File dest = null;
+        try {
+            dest = ResourceUtils.getFile(FileUtils.UPLOAD_PATH+fileName).getAbsoluteFile();
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
         //父目录不存在创建父目录
         if (!dest.getParentFile().exists()) {
             dest.getParentFile().mkdir();
@@ -60,21 +65,19 @@ public class DocService {
             return new ResponseEntity(HttpStatus.NOT_ACCEPTABLE);
         }
         try {
-            wordCount = FileUtils.countWord(FileUtils.MultipartFileToFile(file));
-            //文件信息必须在转换之前处理
             file.transferTo(dest);
+            wordCount = countWord(fileName);
             feature_words = filterKeywords(fileName);
         } catch (IOException e) {
             e.printStackTrace();
             return new ResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR);
         }
-
         //上传文件其他信息
-        Map others = new HashMap();
-        others.put("word_count",wordCount);
-        others.put("file_name",fileName);
-        others.put("feature_words",feature_words);
-        return new ResponseEntity(others,HttpStatus.OK);
+        Map extra = new HashMap();
+        extra.put("word_count",wordCount);
+        extra.put("file_name",fileName);
+        extra.put("feature_words",feature_words);
+        return new ResponseEntity(extra,HttpStatus.OK);
     }
 
     /**
@@ -82,18 +85,21 @@ public class DocService {
      * @param httpServletResponse
      * @param fileName
      */
-    public boolean download(HttpServletResponse httpServletResponse, String fileName) {
+    public boolean download(HttpServletResponse httpServletResponse, String fileName) throws FileNotFoundException {
         //设置编码格式和打开文件方式
         httpServletResponse.setCharacterEncoding("utf-8");
         httpServletResponse.setContentType("application/octet-stream");
-        File file = new File(FileUtils.PATH+fileName);
+//        System.out.println(ResourceUtils.getFile(FileUtils.DOWNLOAD_PATH+fileName).getAbsoluteFile());
+        File file = ResourceUtils.getFile(FileUtils.UPLOAD_PATH+fileName);
         if (!file.exists()) {
             return false;
         }
         try {
             //由于get请求会显示在url上,中文会被转译成urlcode,下载成文件需要解码
             httpServletResponse.setHeader("Content-Disposition", "attachment;fileName="+ URLEncoder.encode(fileName, "utf-8"));
-            InputStream inputStream = new FileInputStream(FileUtils.PATH+fileName);
+            InputStream inputStream =
+//                    new ClassPathResource(fileName).getInputStream();
+                    new FileInputStream(file);
             OutputStream outputStream = httpServletResponse.getOutputStream();
             //创建数据缓冲区，一个个字节读取
             byte[] b = new byte[1024];
@@ -118,7 +124,7 @@ public class DocService {
     public String filterKeywords(String fileName) throws IOException {
         Set<String> featureWords = new HashSet<>();
         Map<String, Integer> frequencies = new HashMap<>();
-        File file = new File(FileUtils.PATH+fileName);
+        File file = ResourceUtils.getFile(FileUtils.UPLOAD_PATH+fileName);
         BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
         String line;
         while ((line = bufferedReader.readLine())!=null){
@@ -138,7 +144,12 @@ public class DocService {
         for(Map.Entry entry : result){
             if((Integer)entry.getValue() >= 3){
                 featureWords.add((String) entry.getKey());
+                //设置特征词数量限制
+                if(featureWords.size() >= 50) {
+                    break;
+                }
             }
+
         }
         return StringUtils.arrayToDelimitedString(featureWords.toArray()," ");
     }
@@ -171,16 +182,16 @@ public class DocService {
      * @throws IOException
      */
     public boolean isHitDictionary(String word) throws IOException {
-        //媒体，自定义热词，城市，人物词典
-        File mediaDic = new File("src/main/resources/static/media.dic");
-        File hotWordDic = new File("src/main/resources/static/hotword.dic");
-        File cityDic = new File("src/main/resources/static/city.dic");
-        File figureDic = new File("src/main/resources/static/figure.dic");
+        //媒体，热词，城市，人物词典
+        InputStream media = getClass().getResourceAsStream("/static/media.dic");
+        InputStream hotword = getClass().getResourceAsStream("/static/hotword.dic");
+        InputStream city = getClass().getResourceAsStream("/static/city.dic");
+        InputStream figure = getClass().getResourceAsStream("/static/figure.dic");
 
-        BufferedReader mediaDicReader = new BufferedReader(new FileReader(mediaDic));
-        BufferedReader hotWordDicReader = new BufferedReader(new FileReader(hotWordDic));
-        BufferedReader cityDicReader = new BufferedReader(new FileReader(cityDic));
-        BufferedReader figureDicReader = new BufferedReader(new FileReader(figureDic));
+        BufferedReader mediaDicReader = new BufferedReader(new InputStreamReader(media));
+        BufferedReader hotWordDicReader = new BufferedReader(new InputStreamReader(hotword));
+        BufferedReader cityDicReader = new BufferedReader(new InputStreamReader(city));
+        BufferedReader figureDicReader = new BufferedReader(new InputStreamReader(figure));
 
         String line;
         while ((line = hotWordDicReader.readLine())!=null){
@@ -204,5 +215,29 @@ public class DocService {
             }
         }
         return false;
+    }
+
+    /**
+     * 统计字数
+     * @param fileName
+     * @return
+     * @throws IOException
+     */
+    public static Integer countWord(String fileName) throws IOException {
+        int wordNum = 0;
+        //统计字数包含中文，中文常用标点符号，字母，数字以及下划线
+        String regex = "[\\u4E00-\\u9FA5|，|。|；|“|”|：|、|！|？|......|{|}|（|）|《|》|\\w]";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher;
+        File file = ResourceUtils.getFile(FileUtils.UPLOAD_PATH+fileName);
+        BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
+        String lineStr;
+        while (( lineStr = bufferedReader.readLine())!=null){
+            matcher = pattern.matcher(lineStr);
+            while(matcher.find()){
+                wordNum++;
+            }
+        }
+        return wordNum;
     }
 }

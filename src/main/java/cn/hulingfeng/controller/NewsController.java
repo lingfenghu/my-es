@@ -12,6 +12,7 @@ import org.jsoup.select.Elements;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.ResourceUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -58,7 +59,7 @@ public class NewsController {
         Elements elements = topNews.select("a");
         for (Element a : elements) {
             //过滤只属于网易新闻的文章
-            if(a.attr("href").startsWith("https://news.163.com")){
+            if(a.attr("href").startsWith("https://news.163.com/20")){
                 urlList.add(a.attr("href"));
             }
         }
@@ -82,7 +83,7 @@ public class NewsController {
         if(this.client.ping(RequestOptions.DEFAULT)){
             for (Element a : elements) {
                 //过滤只属于网易新闻的文章,避免不同页面格式造成解析错误
-                if(a.attr("href").startsWith("https://news.163.com")){
+                if(a.attr("href").startsWith("https://news.163.com/20")){
                     ResponseEntity responseEntity = fetch163News(a.attr("href"));
                     urlList.add(a.attr("href"));
                     responseEntityList.add(responseEntity);
@@ -99,13 +100,13 @@ public class NewsController {
      * @throws ParseException
      */
     public ResponseEntity fetch163News(String url) throws IOException, ParseException {
-        //创建要写入的文件,文件名默认系统时间戳
+        //创建要写入的文件,文件名默认当前系统时间戳
         String fileName = System.currentTimeMillis()+".txt";
         Matcher matcher = URL_PATTERN.matcher(url);
         if(matcher.find()) {
             fileName = matcher.group(1).replace("/","")+".txt";
         }
-        File file = new File(FileUtils.PATH+fileName);
+        File file = ResourceUtils.getFile(FileUtils.UPLOAD_PATH+fileName);
         if(file.exists()){
             return new ResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR);
         }

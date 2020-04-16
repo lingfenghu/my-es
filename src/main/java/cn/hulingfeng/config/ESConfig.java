@@ -16,7 +16,6 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration
 public class ESConfig {
-
     /**
      * 客户端client配置
      * @return

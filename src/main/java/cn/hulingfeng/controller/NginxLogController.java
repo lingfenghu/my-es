@@ -45,6 +45,13 @@ public class NginxLogController {
 
     private ObjectMapper objectMapper = new ObjectMapper();
 
+    /**
+     * 查询某一天的nginx日志
+     * @param date
+     * @param pageNum
+     * @param pageSize
+     * @return
+     */
     @GetMapping("query/nginx_log")
     public ResponseEntity query(
             @RequestParam(name = "date",required = false)
@@ -109,12 +116,11 @@ public class NginxLogController {
      */
     @GetMapping("nginx_logs_excel")
     public ResponseEntity getExcel(
+            HttpServletResponse response,
             @RequestParam(name = "date",required = false)
                 @DateTimeFormat(pattern = "yyyy-MM-dd") Date date,
             @RequestParam(name = "page_num",required = false) Integer pageNum,
-            @RequestParam(name = "page_size",required = false) Integer pageSize,
-            HttpServletResponse response){
-
+            @RequestParam(name = "page_size",required = false) Integer pageSize){
         int rowNum = 0;
         Date now = new Date();
         response.reset();
@@ -192,19 +198,4 @@ public class NginxLogController {
         return new ResponseEntity(HttpStatus.OK);
     }
 
-    /**
-     * 查询日志相关的所有索引名称
-     * @return
-     */
-    public String[] getIndices(){
-        GetIndexRequest request = new GetIndexRequest("nginx-access-*");
-        GetIndexResponse getIndexResponse = null;
-        try {
-            getIndexResponse = client.indices().get(request, RequestOptions.DEFAULT);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        String[] indices = getIndexResponse.getIndices();
-        return indices;
-    }
 }

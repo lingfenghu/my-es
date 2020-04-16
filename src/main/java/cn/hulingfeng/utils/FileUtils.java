@@ -1,10 +1,7 @@
 package cn.hulingfeng.utils;
 
 import org.springframework.web.multipart.MultipartFile;
-
 import java.io.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 /**
  * 文件工具类
@@ -16,33 +13,9 @@ import java.util.regex.Pattern;
  */
 public class FileUtils {
 
-    /**
-     * 文件存储固定路径,文件系统真实路径
-     */
-    public static final String PATH = "src/main/resources/doc/";
+    public static final String UPLOAD_PATH = "src/main/resources/doc/";
 
-    /**
-     * 统计字数
-     * @param file
-     * @return
-     * @throws IOException
-     */
-    public static Integer countWord(File file) throws IOException {
-        int wordNum = 0;
-        //统计字数包含中文，中文常用标点符号，字母，数字以及下划线
-        String regex = "[\\u4E00-\\u9FA5|，|。|；|“|”|：|、|！|？|......|{|}|（|）|《|》|\\w]";
-        Pattern pattern = Pattern.compile(regex);
-        Matcher matcher;
-        BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
-        String lineStr;
-        while (( lineStr = bufferedReader.readLine())!=null){
-            matcher = pattern.matcher(lineStr);
-            while(matcher.find()){
-                wordNum++;
-            }
-        }
-        return wordNum;
-    }
+    public static final String DOWNLOAD_PATH = "classpath:doc/";
 
     /**
      * MultipartFile to file

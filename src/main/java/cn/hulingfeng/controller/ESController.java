@@ -3,15 +3,11 @@ package cn.hulingfeng.controller;
 import cn.hulingfeng.service.ESService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.apache.lucene.util.QueryBuilder;
 import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.delete.DeleteResponse;
 import org.elasticsearch.action.get.GetRequest;
 import org.elasticsearch.action.get.GetResponse;
-import org.elasticsearch.action.index.IndexRequest;
-import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.action.search.SearchRequest;
-import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
 import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.action.update.UpdateResponse;
@@ -19,6 +15,7 @@ import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.elasticsearch.client.indices.CreateIndexRequest;
 import org.elasticsearch.client.indices.CreateIndexResponse;
+import org.elasticsearch.client.indices.GetIndexRequest;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentFactory;
@@ -26,10 +23,11 @@ import org.elasticsearch.index.query.BoolQueryBuilder;
 import org.elasticsearch.index.query.MultiMatchQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.RangeQueryBuilder;
-import org.elasticsearch.index.search.MultiMatchQuery;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -47,87 +45,18 @@ import java.util.*;
  * @date 2020/2/18 20:38
  */
 @RestController
-public class ESController {
+public class ESController  {
 
     @Autowired
     private RestHighLevelClient client;
-
     @Autowired
     private ESService esService;
 
-    public static final  String NEWS_DOCUMENT_INDEX = "news-doc";
-
     private static final Integer DEFAULT_PAGE_SIZE = 10;
 
-    //由于涉及分页，searchResponse返回的东西比较杂，于是将查询结果和总条数提取出来，再转换成json格式返回给前端
+    public static final  String NEWS_DOCUMENT_INDEX = "news-doc";
+    //结果转换JSON
     private ObjectMapper objectMapper = new ObjectMapper();
-
-    /**
-     * 创建文档索引
-     * @param indexName
-     * @return
-     * @throws IOException
-     */
-    @PostMapping("/index/create")
-    public ResponseEntity createIndex(@RequestParam(name = "indexName", defaultValue = NEWS_DOCUMENT_INDEX) String indexName) {
-        CreateIndexRequest request = new CreateIndexRequest(indexName);
-        request.settings(Settings.builder()
-                .put("index.number_of_shards", 5)
-                .put("index.number_of_replicas", 0)
-        );
-        //mapping构建
-        XContentBuilder builder = null;
-        CreateIndexResponse createIndexResponse = null;
-        try {
-            builder = XContentFactory.jsonBuilder().startObject()
-                    .startObject("properties")
-                        .startObject("title")//标题
-                            .field("type", "text")
-                            .field("analyzer","ik_max_word")
-                        .endObject()
-                        .startObject("publish_date")//发表日期
-                            .field("type", "date")
-                            .field("format", "yyyy-MM-dd HH:mm:ss||yyyy-MM-dd||epoch_millis")
-                        .endObject()
-                        .startObject("source")//来源
-                            .field("type", "text")
-                            .field("analyzer","ik_max_word")
-                            .field("search_analyzer","ik_smart")
-                        .endObject()
-                        .startObject("editor")//责任编辑
-                            .field("type", "text")
-                            .field("analyzer","ik_max_word")
-                        .endObject()
-                        .startObject("desc")//简述
-                            .field("type", "text")
-                            .field("analyzer","ik_max_word")
-                        .endObject()
-                        .startObject("file_name")//文件名
-                            .field("type", "keyword")
-                        .endObject()
-                        .startObject("word_count")//总字数
-                            .field("type", "integer")
-                        .endObject()
-                        .startObject("feature_words")//特征关键字
-                            .field("type", "text")
-                            .field("analyzer","whitespace")
-                        .endObject()
-                    .endObject()
-            .endObject();
-            request.mapping(builder);
-
-            createIndexResponse = this.client.indices().create(request, RequestOptions.DEFAULT);
-        } catch (IOException e) {
-            e.printStackTrace();
-            return new ResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-
-        boolean acknowledged = createIndexResponse.isAcknowledged();
-        if (acknowledged) {
-            return new ResponseEntity(HttpStatus.OK);
-        }
-        return new ResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR);
-    }
 
     /**
      * 通过id获取文档
@@ -357,5 +286,4 @@ public class ESController {
             return new ResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
-
 }

@@ -1,0 +1,4 @@
+upload:
+  path: src/main/resources/doc/
+download:
+  path: classpath:doc/
