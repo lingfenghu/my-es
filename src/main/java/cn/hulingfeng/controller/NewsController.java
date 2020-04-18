@@ -2,21 +2,24 @@ package cn.hulingfeng.controller;
 
 import cn.hulingfeng.service.DocService;
 import cn.hulingfeng.service.ESService;
-import cn.hulingfeng.utils.FileUtils;
+import org.apache.logging.log4j.core.util.FileUtils;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestHighLevelClient;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.util.ResourceUtils;
+import org.springframework.util.FileSystemUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.*;
+import java.net.URLDecoder;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -42,6 +45,9 @@ public class NewsController {
     @Autowired
     private RestHighLevelClient client;
 
+    private static final Logger log = LoggerFactory.getLogger(NewsController.class);
+
+
     private static Pattern URL_PATTERN = Pattern.compile("https://news.163.com/(\\d{2}/\\d{4}/\\d{2}/\\w+).html");
     private static Pattern DATE_PATTERN = Pattern.compile("\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}:\\d{2}");
 
@@ -51,10 +57,15 @@ public class NewsController {
      * @throws Exception
      */
     @GetMapping("get_top_news_url")
-    public List<String> fetch163TopNewsUrl() throws Exception {
+    public List<String> fetch163TopNewsUrl() {
         String newswebsite = "https://news.163.com/";
         List<String> urlList = new ArrayList<>();
-        Document document = Jsoup.connect(newswebsite).validateTLSCertificates(false).get();
+        Document document = null;
+        try {
+            document = Jsoup.connect(newswebsite).validateTLSCertificates(false).get();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         Element topNews = document.getElementById("js_top_news");
         Elements elements = topNews.select("a");
         for (Element a : elements) {
@@ -72,23 +83,32 @@ public class NewsController {
      * @throws ParseException
      */
     @GetMapping("fetch_news")
-    public List<ResponseEntity> fetch163TopNews() throws Exception {
+    public List<ResponseEntity> fetch163TopNews() {
         String newswebsite = "https://news.163.com/";
         List<ResponseEntity> responseEntityList = new ArrayList<>();
         List<String> urlList = new ArrayList<>();
-        Document document = Jsoup.connect(newswebsite).validateTLSCertificates(false).get();
+        Document document = null;
+        try {
+            document = Jsoup.connect(newswebsite).validateTLSCertificates(false).get();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         Element topNews = document.getElementById("js_top_news");
         Elements elements = topNews.select("a");
         //确保es连接
-        if(this.client.ping(RequestOptions.DEFAULT)){
-            for (Element a : elements) {
-                //过滤只属于网易新闻的文章,避免不同页面格式造成解析错误
-                if(a.attr("href").startsWith("https://news.163.com/20")){
-                    ResponseEntity responseEntity = fetch163News(a.attr("href"));
-                    urlList.add(a.attr("href"));
-                    responseEntityList.add(responseEntity);
+        try {
+            if(this.client.ping(RequestOptions.DEFAULT)){
+                for (Element a : elements) {
+                    //过滤只属于网易新闻的文章,避免不同页面格式造成解析错误
+                    if(a.attr("href").startsWith("https://news.163.com/20")){
+                        ResponseEntity responseEntity = fetch163News(a.attr("href"));
+                        urlList.add(a.attr("href"));
+                        responseEntityList.add(responseEntity);
+                    }
                 }
             }
+        } catch (IOException | ParseException e) {
+            e.printStackTrace();
         }
         return responseEntityList;
     }
@@ -106,11 +126,12 @@ public class NewsController {
         if(matcher.find()) {
             fileName = matcher.group(1).replace("/","")+".txt";
         }
-        File file = ResourceUtils.getFile(FileUtils.UPLOAD_PATH+fileName);
+        String path = URLDecoder.decode(getClass().getResource("/doc").getPath(),"utf-8");
+        File file = new File(path+fileName);
         if(file.exists()){
             return new ResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR);
         }
-        BufferedWriter bufferedWriter = new BufferedWriter(new FileWriter(file));
+        BufferedWriter bufferedWriter = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(file),"utf-8"));
         //解析网页新闻文档
         Document document = Jsoup.connect(url).validateTLSCertificates(false).get();
         Element postContentMain = document.getElementsByClass("post_content_main").first();
