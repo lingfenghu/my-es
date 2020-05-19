@@ -36,6 +36,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -47,7 +48,7 @@ import java.util.*;
  * @date 2020/2/18 20:38
  */
 @RestController
-public class ESController  {
+public class ESController {
 
     @Autowired
     private RestHighLevelClient client;
@@ -202,7 +203,7 @@ public class ESController  {
                 @DateTimeFormat(pattern = "yyyy-MM-dd") Date gtPublishDate,
             @RequestParam(name = "lt_publish_date",required = false)
                 @DateTimeFormat(pattern = "yyyy-MM-dd")Date ltPublishDate,
-            @RequestParam(name = "page_num",defaultValue = "1")Integer pageNum) {
+            @RequestParam(name = "page_num",defaultValue = "1")Integer pageNum) throws ParseException {
         BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
         RangeQueryBuilder wordCountRangeQuery = QueryBuilders.rangeQuery("word_count").from(gtWordCount);
         if(ltWordCount != null && ltWordCount > 0){
@@ -210,16 +211,19 @@ public class ESController  {
         }
         boolQuery.filter(wordCountRangeQuery);
 
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
         RangeQueryBuilder dateRangeQuery = QueryBuilders.rangeQuery("publish_date");
         if(gtPublishDate != null){
-            dateRangeQuery.from(gtPublishDate.getTime());
+//            dateRangeQuery.from(gtPublishDate.getTime());
+            dateRangeQuery.from(sdf.format(gtPublishDate));
         }
         //将结束时间加一天
         if(ltPublishDate != null){
             Calendar calendar = Calendar.getInstance();
             calendar.setTime(ltPublishDate);
             calendar.add(Calendar.DAY_OF_MONTH,1);
-            dateRangeQuery.to(calendar.getTimeInMillis());
+//            dateRangeQuery.to(calendar.getTimeInMillis());
+            dateRangeQuery.to(sdf.format(calendar.getTimeInMillis()));
         }
         boolQuery.filter(dateRangeQuery);
 
