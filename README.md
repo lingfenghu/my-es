@@ -1,5 +1,8 @@
 # Elasticsearch的简单应用,新闻文档简单过滤和管理，nginx日志集中管理
+后端框架：SpringBoot整合Elasticsearch客户端
+前端：Vue + axios + element
 ### 预览图片在raw文件夹下。
+## my-es 基于Elasticsearch和文本过滤的文档管理终端 [前端部分](https://github.com/lingfenghu/my-vue)
 ### 项目clone到本地后，打包成war后可直接在tomcat启动运行，当然首先要确保Elasticsearch连接成功
 ### 预览图片在raw文件夹下。
 ### es和logstash配置文件在elk_config文件夹下
