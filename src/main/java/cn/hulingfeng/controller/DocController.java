@@ -2,6 +2,8 @@ package cn.hulingfeng.controller;
 
 import cn.hulingfeng.service.DocService;
 import cn.hulingfeng.service.ESService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
@@ -31,6 +33,8 @@ public class DocController {
     @Autowired
     private ESService esService;
 
+    private static final Logger log = LoggerFactory.getLogger(DocController.class);
+
     /**
      * 文档上传
      * @param file
@@ -52,7 +56,7 @@ public class DocController {
      * @throws FileNotFoundException
      */
     @GetMapping("file_download")
-    public ResponseEntity fileDownload(HttpServletResponse httpServletResponse, @RequestParam(name = "file_name")String fileName) throws FileNotFoundException {
+    public ResponseEntity fileDownload(HttpServletResponse httpServletResponse, @RequestParam(name = "file_name")String fileName){
         if(!docService.download(httpServletResponse,fileName)){
             return new ResponseEntity(HttpStatus.NOT_FOUND);
         }

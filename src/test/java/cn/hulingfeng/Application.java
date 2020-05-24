@@ -42,6 +42,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
 import java.util.*;
@@ -315,7 +316,7 @@ public class Application {
             fileName = matcher.group(1).replace("/","")+".txt";
 
         }
-        File file = new File(FileUtils.PATH+fileName);
+        File file = new File(FileUtils.UPLOAD_PATH+fileName);
         if(file.exists()){
 //            return new ResponseEntity(HttpStatus.INTERNAL_SERVER_ERROR);
         }
@@ -437,8 +438,8 @@ public class Application {
         Set<String> featureWords = new HashSet<>();
         Map<String, Integer> frequencies = new HashMap<>();
 //        String fileName = "test.txt";
-        String fileName = "20032908F8SH3FHL0001899O.txt";
-        File file = new File(FileUtils.PATH+fileName);
+        String fileName = "20040522F9FV4OCQ0001899O.txt";
+        File file = new File(FileUtils.UPLOAD_PATH+fileName);
         BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
         String line;
         while ((line = bufferedReader.readLine())!=null){
@@ -460,6 +461,7 @@ public class Application {
         for(Map.Entry entry : result){
             if((Integer)entry.getValue() >= 3){
                 featureWords.add((String) entry.getKey());
+                if(featureWords.size() >= 50) break;
             }
         }
         String features = StringUtils.arrayToDelimitedString(featureWords.toArray()," ");
@@ -517,4 +519,5 @@ public class Application {
         }
         return false;
     }
+
 }

@@ -23,7 +23,7 @@ public class FileUtils {
      * @return
      * @throws IOException
      */
-    public static File MultipartFileToFile(MultipartFile multipartFile) throws IOException {
+    public static File multipartFileToFile(MultipartFile multipartFile) throws IOException {
         File file = new File(multipartFile.getOriginalFilename());
         InputStream inputStream = multipartFile.getInputStream();
         OutputStream outputStream = new FileOutputStream(file);
@@ -36,5 +36,20 @@ public class FileUtils {
         inputStream.close();
         outputStream.close();
         return file;
+    }
+
+    public static File convertAsUTF8(File file) throws IOException {
+        File resultFile = new File(file.getPath());
+        BufferedReader bufferedReader = new BufferedReader(
+                new InputStreamReader(new FileInputStream(file)));
+        BufferedWriter bufferedWriter = new BufferedWriter(
+                new OutputStreamWriter(new FileOutputStream(resultFile), "UTF-8"));
+        String lineStr;
+        while (( lineStr = bufferedReader.readLine())!=null){
+            bufferedWriter.write(lineStr);
+        }
+        bufferedWriter.close();
+        bufferedReader.close();
+        return resultFile;
     }
 }

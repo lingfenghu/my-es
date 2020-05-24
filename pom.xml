@@ -4,7 +4,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>org.example</groupId>
-    <artifactId>es</artifactId>
+    <artifactId>my-es</artifactId>
     <version>1.0-SNAPSHOT</version>
     <packaging>war</packaging>
 
@@ -109,19 +109,5 @@
             <artifactId>jsoup</artifactId>
             <version>1.10.2</version>
         </dependency>
-
     </dependencies>
-    <build>
-        <finalName>es</finalName>
-        <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-                <!-- 2 热部署 -->
-                <configuration>
-                    <fork>true</fork>
-                </configuration>
-            </plugin>
-        </plugins>
-    </build>
 </project>

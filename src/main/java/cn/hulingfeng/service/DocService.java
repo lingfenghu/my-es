@@ -8,7 +8,8 @@ import org.elasticsearch.client.indices.AnalyzeResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ClassPathResource;
+import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.ApplicationRunner;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -18,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -31,12 +33,24 @@ import java.util.regex.Pattern;
  * @date 2020/2/8 14:47
  */
 @Service
-public class DocService {
+public class DocService implements ApplicationRunner {
 
     @Autowired
     private RestHighLevelClient client;
 
-    private static final Logger log = LoggerFactory.getLogger(DocService.class);
+    /**
+     * 自动创建新闻文档存放的目录
+     * @param args
+     * @throws Exception
+     */
+    @Override
+    public void run(ApplicationArguments args) throws Exception {
+        String path = URLDecoder.decode(getClass().getResource("/").getPath(),"utf-8");
+        File dir = new File(path+"doc");
+        if(!dir.exists()){
+            dir.mkdir();
+        }
+    }
 
     /**
      * 文件上传服务
@@ -44,18 +58,19 @@ public class DocService {
      * @return
      */
     public ResponseEntity upload(MultipartFile file) {
-        int wordCount;
-        String feature_words;
+        int wordCount = 0;
+        String feature_words = null;
         //文件名和文件类型
         String originalFilename = file.getOriginalFilename();
         String fileName = System.currentTimeMillis()+originalFilename.substring(originalFilename.lastIndexOf("."));
-        //将路径转换为绝对路径
-        File dest = null;
+        String path = null;
+        //获取服务器项目根目录url
         try {
-            dest = ResourceUtils.getFile(FileUtils.UPLOAD_PATH+fileName).getAbsoluteFile();
-        } catch (FileNotFoundException e) {
+            path = URLDecoder.decode(getClass().getResource("/doc").getPath(),"utf-8");
+        } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
         }
+        File dest = new File(path+fileName);
         //父目录不存在创建父目录
         if (!dest.getParentFile().exists()) {
             dest.getParentFile().mkdir();
@@ -85,13 +100,15 @@ public class DocService {
      * @param httpServletResponse
      * @param fileName
      */
-    public boolean download(HttpServletResponse httpServletResponse, String fileName) throws FileNotFoundException {
+    public boolean download(HttpServletResponse httpServletResponse, String fileName) {
         //设置编码格式和打开文件方式
         httpServletResponse.setCharacterEncoding("utf-8");
         httpServletResponse.setContentType("application/octet-stream");
-//        System.out.println(ResourceUtils.getFile(FileUtils.DOWNLOAD_PATH+fileName).getAbsoluteFile());
-        File file = ResourceUtils.getFile(FileUtils.UPLOAD_PATH+fileName);
-        if (!file.exists()) {
+        File file = null;
+        try {
+            file = ResourceUtils.getFile(FileUtils.DOWNLOAD_PATH+fileName);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
             return false;
         }
         try {
@@ -124,8 +141,10 @@ public class DocService {
     public String filterKeywords(String fileName) throws IOException {
         Set<String> featureWords = new HashSet<>();
         Map<String, Integer> frequencies = new HashMap<>();
-        File file = ResourceUtils.getFile(FileUtils.UPLOAD_PATH+fileName);
-        BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
+        //本地运行 UPLOAD_PATH:src/main/resources/doc
+        File file = ResourceUtils.getFile(FileUtils.DOWNLOAD_PATH+fileName);
+        //解决读取乱码问题
+        BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(new FileInputStream(file),"UTF-8"));
         String line;
         while ((line = bufferedReader.readLine())!=null){
             AnalyzeRequest request = AnalyzeRequest.withGlobalAnalyzer("ik_smart", line);
@@ -140,6 +159,7 @@ public class DocService {
             }
         }
         List<Map.Entry<String, Integer>> result = new ArrayList<>(frequencies.entrySet());
+        //对词根据出现频数排序
         Collections.sort(result, (o1, o2) -> o2.getValue() - o1.getValue());
         for(Map.Entry entry : result){
             if((Integer)entry.getValue() >= 3){
@@ -149,7 +169,6 @@ public class DocService {
                     break;
                 }
             }
-
         }
         return StringUtils.arrayToDelimitedString(featureWords.toArray()," ");
     }
@@ -229,8 +248,9 @@ public class DocService {
         String regex = "[\\u4E00-\\u9FA5|，|。|；|“|”|：|、|！|？|......|{|}|（|）|《|》|\\w]";
         Pattern pattern = Pattern.compile(regex);
         Matcher matcher;
-        File file = ResourceUtils.getFile(FileUtils.UPLOAD_PATH+fileName);
-        BufferedReader bufferedReader = new BufferedReader(new FileReader(file));
+        //本地运行 UPLOAD_PATH:src/main/resources/doc
+        File file = ResourceUtils.getFile(FileUtils.DOWNLOAD_PATH+fileName);
+        BufferedReader bufferedReader = new BufferedReader(new InputStreamReader(new FileInputStream(file),"UTF-8"));
         String lineStr;
         while (( lineStr = bufferedReader.readLine())!=null){
             matcher = pattern.matcher(lineStr);
@@ -240,4 +260,5 @@ public class DocService {
         }
         return wordNum;
     }
+
 }
